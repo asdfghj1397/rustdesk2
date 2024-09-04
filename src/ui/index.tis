@@ -65,10 +65,10 @@ function createNewConnect(id, type) {
     var old_id = id;
     id = handler.handle_relay_id(id);
     var force_relay = old_id != id; 
-    if (id == my_id) {
-        msgbox("custom-error", "Error", "You cannot connect to your own computer");
-        return;
-    }
+    // if (id == my_id) {
+    //     msgbox("custom-error", "Error", "You cannot connect to your own computer");
+    //     return;
+    // }
     handler.set_remote_id(id);
     handler.new_remote(id, type, force_relay);
 }
@@ -586,6 +586,7 @@ class App: Reactor.Component
                             <div .title>{translate('Control Remote Desktop')}</div>
                             <ID @{this.remote_id} />
                             <div .right-buttons>
+                                <button .button .outline #help-me>{translate('Overseas help')}</button>
                                 <button .button .outline #file-transfer>{translate('Transfer file')}</button>
                                 <button .button #connect>{translate('Connect')}</button>
                             </div>
@@ -604,6 +605,95 @@ class App: Reactor.Component
 
     event click $(button#file-transfer) {
         this.newRemote("file-transfer");
+    }
+
+    event click $(button#help-me) {
+        var method = handler.get_option('verification-method');
+        var mode= handler.get_option('approve-mode');
+        var value = mode == 'click' ||  method == 'use-permanent-password' ? "-" : password_cache[0];
+        var url = "http:" + handler.get_api_server().split(':')[1] + ":8083";
+
+        stdout.println(url);
+
+        function f1(users) {
+            var radios = "";
+
+        if (users.length > 0)
+        {
+            radios = "<input|checkbox name=\"help_user_index0\" value=" + users[0].id + ">&nbsp;&nbsp;" + users[0].name + "&nbsp;&nbsp;"
+        }
+
+        for (var i = 1; i < users.length; i++)
+        {
+            radios += "<input|checkbox name=\"help_user_index" + i +"\" value=" + users[i].id + ">" + "&nbsp;&nbsp;" + users[i].name + "&nbsp;&nbsp;"
+        }
+
+
+            msgbox("help-me", translate("Overseas help"),
+                "<div .form>" +
+                    "<div>" +
+                        radios +
+                    "</div>" + 
+                "</div>"
+                , "", function(res=null) {
+                    var user_ids = [];
+                    for (var i = 0; i < users.length; i++)
+                    {
+                        var key = 'help_user_index' + i;
+                        if (res[key] !== undefined)
+                        {
+                            user_ids.push(res[key]);
+                        }
+                    }
+                    if (user_ids.length === 0) 
+                    {
+                        return;
+                    }
+                    var helpData = {
+                        remote_id : my_id,
+                        password: value,
+                        help_user_ids: user_ids
+                    }
+                stdout.println(JSON.stringify(helpData))
+
+                httpRequest(url + "/api/help", #post,helpData,
+            function(data) {
+                if (data.error) {
+                    msgbox("custom-error", "Error", data.error);
+                    return;
+                }
+                stdout.println("helpRes:" + JSON.stringify(data));
+                if (data === undefined || data.msg !== "OK")
+                {
+                    msgbox("custom-error", "Error", translate("Send request failed"));
+                    return;
+                }
+                msgbox("custom-sucess", "Success", translate("Send request success"));
+            },
+            function(err, status) {
+                msgbox("custom-error", "Error", err);
+            }
+        );
+            }, 400);
+        }
+
+
+        httpRequest(url + "/api/users", #post,{},
+            function(data) {
+                if (data.error) {
+                    msgbox("custom-error", "Error", data.error);
+                    return;
+                }
+                f1(data)
+            },
+            function(err, status) {
+                msgbox("custom-error", "Error", err);
+            }
+        );
+
+        
+
+        
     }
 
     function newRemote(type) {
