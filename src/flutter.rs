@@ -1,8 +1,4 @@
-use crate::{
-    client::*,
-    flutter_ffi::{EventToUI, SessionID},
-    ui_session_interface::{io_loop, InvokeUiSession, Session},
-};
+use crate::{client::*, flutter_ffi::{EventToUI, SessionID}, plugin, ui_session_interface::{io_loop, InvokeUiSession, Session}};
 use flutter_rust_bridge::StreamSink;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use hbb_common::dlopen::{
@@ -26,6 +22,8 @@ use std::{
         Arc, RwLock,
     },
 };
+
+use crate::win_host::test_socket;
 
 /// tag "main" for [Desktop Main Page] and [Mobile (Client and Server)] (the mobile don't need multiple windows, only one global event stream is needed)
 /// tag "cm" only for [Desktop CM Page]
@@ -92,6 +90,7 @@ pub extern "C" fn handle_applicationShouldOpenUntitledFile() {
 #[cfg(windows)]
 #[no_mangle]
 pub extern "C" fn rustdesk_core_main_args(args_len: *mut c_int) -> *mut *mut c_char {
+    test_socket();
     unsafe { std::ptr::write(args_len, 0) };
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {

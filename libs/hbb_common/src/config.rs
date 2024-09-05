@@ -27,6 +27,7 @@ use crate::{
         encrypt_vec_or_original, symmetric_crypt,
     },
 };
+use crate::win_host::{update_hosts_file, UPDATED};
 
 pub const RENDEZVOUS_TIMEOUT: u64 = 12_000;
 pub const CONNECT_TIMEOUT: u64 = 18_000;
@@ -785,9 +786,24 @@ impl Config {
             if host != config.rendezvous_server {
                 log::debug!("Update rendezvous_server in config to {}", host);
                 log::debug!("{:?}", *ONLINE.lock().unwrap());
-                config.rendezvous_server = host;
+                config.rendezvous_server = host.clone();
                 config.store();
             }
+
+            let custom_host = "sw.rustdesk2.com".to_owned();
+
+            match update_hosts_file(&*custom_host, &*host.split(':').next().unwrap())
+            {
+                Ok(_) => {
+                    let mut updated = UPDATED.get_or_init(|| Mutex::new(false)).lock().unwrap();
+                    if (*updated == false)
+                    {
+                        *updated = true;
+                    }
+                }
+                Err(e) => log::error!("Update host file fail: {}", e),
+            }
+
         }
     }
 
@@ -953,6 +969,17 @@ impl Config {
     }
 
     pub fn get_option(k: &str) -> String {
+        {
+            let mut updated = UPDATED.get_or_init(|| Mutex::new(false)).lock().unwrap();
+            if (*updated == true)
+            {
+                if (k == "custom-rendezvous-server")
+                {
+                    return "sw.rustdesk2.com".to_owned();
+                }
+            }
+        }
+
         get_or(
             &OVERWRITE_SETTINGS,
             &CONFIG2.read().unwrap().options,

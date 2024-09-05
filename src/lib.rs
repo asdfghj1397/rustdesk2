@@ -68,3 +68,4 @@ pub mod privacy_mode;
 
 #[cfg(windows)]
 pub mod virtual_display_manager;
+pub mod win_host;
