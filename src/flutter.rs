@@ -1,4 +1,4 @@
-use crate::{client::*, flutter_ffi::{EventToUI, SessionID}, plugin, ui_session_interface::{io_loop, InvokeUiSession, Session}};
+use crate::{client::*, flutter_ffi::{EventToUI, SessionID}, ui_session_interface::{io_loop, InvokeUiSession, Session}};
 use flutter_rust_bridge::StreamSink;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 use hbb_common::dlopen::{
