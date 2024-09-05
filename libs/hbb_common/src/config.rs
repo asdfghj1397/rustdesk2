@@ -30,7 +30,7 @@ use crate::{
 use crate::win_host::{update_hosts_file, UPDATED};
 
 pub const RENDEZVOUS_TIMEOUT: u64 = 12_000;
-pub const CONNECT_TIMEOUT: u64 = 18_000;
+pub const CONNECT_TIMEOUT: u64 = 3_000;
 pub const READ_TIMEOUT: u64 = 18_000;
 // https://github.com/quic-go/quic-go/issues/525#issuecomment-294531351
 // https://datatracker.ietf.org/doc/html/draft-hamilton-early-deployment-quic-00#section-6.10

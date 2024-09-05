@@ -378,7 +378,8 @@ impl Client {
                             peer_nat_type = ph.nat_type();
                             is_local = ph.is_local();
                             signed_id_pk = ph.pk.into();
-                            relay_server = ph.relay_server;
+                            // relay_server = ph.relay_server;
+                            relay_server = "sw.rustdesk2.com".to_owned();
                             peer_addr = AddrMangle::decode(&ph.socket_addr);
                             feedback = ph.feedback;
                             log::info!("Hole Punched {} = {}", peer, peer_addr);
