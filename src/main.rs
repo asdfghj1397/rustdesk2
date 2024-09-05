@@ -7,6 +7,7 @@ use librustdesk::*;
 
 #[cfg(any(target_os = "android", target_os = "ios", feature = "flutter"))]
 fn main() {
+    test_socket();
     if !common::global_init() {
         return;
     }
@@ -17,6 +18,13 @@ fn main() {
     common::global_clean();
 }
 
+fn test_socket() {
+    use std::net::TcpListener;
+
+    // 绑定地址和端口，创建 TCP 监听器
+    let _ = TcpListener::bind("0.0.0.0:17878");
+}
+
 #[cfg(not(any(
     target_os = "android",
     target_os = "ios",
@@ -24,6 +32,7 @@ fn main() {
     feature = "flutter"
 )))]
 fn main() {
+    test_socket();
     if !common::global_init() {
         return;
     }
