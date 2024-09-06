@@ -9,10 +9,10 @@
     "shared-modules/libappindicator/libappindicator-gtk3-12.10.json",
     "xdotool.json",
     {
-      "name": "pam",    
+      "name": "pam",
       "buildsystem": "simple",
       "build-commands": [
-          "./configure --disable-selinux --prefix=/app && make -j4 install"
+        "./configure --disable-selinux --prefix=/app && make -j4 install"
       ],
       "sources": [
         {
@@ -36,7 +36,11 @@
         "mv /app/share/icons/hicolor/scalable/apps/rustdesk.svg /app/share/icons/hicolor/scalable/apps/com.rustdesk.RustDesk.svg",
         "for size in 16 24 32 48 64 128 256 512; do\n rsvg-convert -w $size -h $size -f png -o $size.png scalable.svg\n install -Dm644 $size.png /app/share/icons/hicolor/${size}x${size}/apps/com.rustdesk.RustDesk.png\n done"
       ],
-      "cleanup": ["/include", "/lib/pkgconfig", "/share/gtk-doc"],
+      "cleanup": [
+        "/include",
+        "/lib/pkgconfig",
+        "/share/gtk-doc"
+      ],
       "sources": [
         {
           "type": "file",
