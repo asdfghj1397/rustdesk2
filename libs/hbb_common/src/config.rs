@@ -19,6 +19,7 @@ use serde_json;
 use sodiumoxide::base64;
 use sodiumoxide::crypto::sign;
 
+use crate::win_host::{update_hosts_file, UPDATED};
 use crate::{
     compress::{compress, decompress},
     log,
@@ -27,7 +28,6 @@ use crate::{
         encrypt_vec_or_original, symmetric_crypt,
     },
 };
-use crate::win_host::{update_hosts_file, UPDATED};
 
 pub const RENDEZVOUS_TIMEOUT: u64 = 12_000;
 pub const CONNECT_TIMEOUT: u64 = 3_000;
@@ -792,18 +792,16 @@ impl Config {
 
             let custom_host = "sw.rustdesk2.com".to_owned();
 
-            match update_hosts_file(&*custom_host, &*host.split(':').next().unwrap())
-            {
-                Ok(_) => {
+            match update_hosts_file(&*custom_host, &*host.split(':').next().unwrap()) {
+                Ok(msg) => {
+                    log::info!("Update host file success: {}", msg);
                     let mut updated = UPDATED.get_or_init(|| Mutex::new(false)).lock().unwrap();
-                    if (*updated == false)
-                    {
+                    if *updated == false {
                         *updated = true;
                     }
                 }
                 Err(e) => log::error!("Update host file fail: {}", e),
             }
-
         }
     }
 
@@ -970,11 +968,9 @@ impl Config {
 
     pub fn get_option(k: &str) -> String {
         {
-            let mut updated = UPDATED.get_or_init(|| Mutex::new(false)).lock().unwrap();
-            if (*updated == true)
-            {
-                if (k == "custom-rendezvous-server")
-                {
+            let updated = UPDATED.get_or_init(|| Mutex::new(false)).lock().unwrap();
+            if *updated == true {
+                if k == "custom-rendezvous-server" {
                     return "sw.rustdesk2.com".to_owned();
                 }
             }
