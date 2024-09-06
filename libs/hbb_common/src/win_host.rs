@@ -1,8 +1,9 @@
+use regex::Regex;
 use std::fs::{self, OpenOptions};
-use std::io::{self, BufRead, Write};
+use std::io::{self, BufRead};
+use std::os::windows::fs::MetadataExt;
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
-use regex::Regex;
 
 // `/etc/hosts` 文件的路径（在 Windows 上可能是 `C:\\Windows\\System32\\drivers\\etc\\hosts`）
 const HOSTS_PATH: &str = "C:\\Windows\\System32\\drivers\\etc\\hosts";
@@ -17,9 +18,28 @@ const HOSTS_PATH: &str = "C:\\Windows\\System32\\drivers\\etc\\hosts";
 /// - `Ok(String)`: 操作成功时，返回操作的结果描述
 /// - `Err(io::Error)`: 操作失败时，返回错误信息
 
-
-
 pub static UPDATED: OnceLock<Mutex<bool>> = OnceLock::new();
+
+fn remove_readonly_attribute(file_path: &str) -> io::Result<()> {
+    // 获取文件元数据
+    let metadata = fs::metadata(file_path)?;
+
+    // 获取文件属性
+    let attributes = metadata.file_attributes();
+
+    // 检查是否设置了只读属性
+    if (attributes & 0x00000001) != 0 {
+        // 如果有只读属性，则移除它
+        let mut permissions = metadata.permissions();
+        permissions.set_readonly(false);
+        fs::set_permissions(file_path, permissions)?;
+        println!("已移除只读属性");
+    } else {
+        println!("文件没有只读属性");
+    }
+
+    Ok(())
+}
 
 fn is_valid_ipv4(ip: &str) -> bool {
     let re = Regex::new(r"^(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])\.(25[0-5]|2[0-4][0-9]|1[0-9]{2}|[1-9]?[0-9])$")
@@ -28,11 +48,11 @@ fn is_valid_ipv4(ip: &str) -> bool {
 }
 
 pub fn update_hosts_file(domain: &str, target_ip: &str) -> io::Result<String> {
-
-    if (!is_valid_ipv4(target_ip))
-    {
+    if (!is_valid_ipv4(target_ip)) {
         return Ok("无效的ip地址".to_owned());
     }
+
+    remove_readonly_attribute(HOSTS_PATH)?;
 
     // Step 1: 读取 `/etc/hosts` 文件内容
     let path = Path::new(HOSTS_PATH);
@@ -61,7 +81,10 @@ pub fn update_hosts_file(domain: &str, target_ip: &str) -> io::Result<String> {
                 // 检查是否IP与目标IP一致
                 if parts[0] == target_ip {
                     found = true;
-                    return Ok(format!("域名 {} 已经正确解析到 IP {}，无需修改。", domain, target_ip));
+                    return Ok(format!(
+                        "域名 {} 已经正确解析到 IP {}，无需修改。",
+                        domain, target_ip
+                    ));
                 } else {
                     lines.push(format!("{} {}", target_ip, domain));
                     updated = true;
@@ -81,7 +104,10 @@ pub fn update_hosts_file(domain: &str, target_ip: &str) -> io::Result<String> {
     // Step 4: 如果需要更新文件，则写入修改
     if updated {
         fs::write(HOSTS_PATH, lines.join("\n"))?;
-        return Ok(format!("域名 {} 的解析记录已更新为 IP {}。", domain, target_ip));
+        return Ok(format!(
+            "域名 {} 的解析记录已更新为 IP {}。",
+            domain, target_ip
+        ));
     }
 
     Ok(format!("域名 {} 的解析记录没有变化。", domain))
