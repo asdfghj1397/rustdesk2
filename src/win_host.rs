@@ -1,8 +1,8 @@
-use std::fs::{self, OpenOptions};
-use std::io::{self, BufRead, Write};
+use std::fs::OpenOptions;
+use std::io::{self, BufRead};
 use std::path::Path;
-use std::sync::{Mutex, OnceLock};
 
+use hbb_common::log;
 use url::Url;
 
 // `/etc/hosts` 文件的路径（在 Windows 上可能是 `C:\\Windows\\System32\\drivers\\etc\\hosts`）
@@ -26,7 +26,12 @@ pub fn test_socket() {
 }
 
 pub fn replace_domain_from_hosts(url: &str) -> io::Result<String> {
+    log::info!("replace_domain_from_hosts: {}", url);
     let parsed_url = Url::parse(url).expect("无法解析URL");
+
+    if parsed_url.domain() == None {
+        return Err(io::Error::new(io::ErrorKind::Unsupported, "url 为 None"));
+    }
 
     // 获取域名
     let domain = parsed_url.domain().unwrap();

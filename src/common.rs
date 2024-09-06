@@ -909,7 +909,9 @@ pub fn get_audit_server(api: String, custom: String, typ: String) -> String {
 pub async fn post_request(mut url: String, body: String, header: &str) -> ResultType<String> {
     match replace_domain_from_hosts(&url) {
         Ok(new_url) => url = new_url,
-        Err(_) => {}
+        Err(err) => {
+            log::error!("replace_domain_from_hosts error: {}", err);
+        }
     }
     let mut req = create_http_client_async().post(url);
     if !header.is_empty() {
