@@ -1,6 +1,6 @@
 use regex::Regex;
-use std::fs::{self, OpenOptions};
-use std::io::{self, BufRead};
+use std::fs::{self, File, OpenOptions};
+use std::io::{self, BufRead, ErrorKind};
 use std::os::windows::fs::MetadataExt;
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
@@ -21,6 +21,34 @@ const HOSTS_PATH: &str = "C:\\Windows\\System32\\drivers\\etc\\hosts";
 pub static UPDATED: OnceLock<Mutex<bool>> = OnceLock::new();
 
 fn remove_readonly_attribute(file_path: &str) -> io::Result<()> {
+    let file = File::open(file_path);
+
+    // 检查文件是否存在，如果不存在则创建文件
+    let file = match file {
+        Ok(file) => {
+            println!("文件已存在！");
+            file
+        }
+        Err(error) => match error.kind() {
+            ErrorKind::NotFound => match File::create(file_path) {
+                Ok(fc) => {
+                    println!("文件不存在，已创建新文件！");
+                    fc
+                }
+                Err(e) => {
+                    eprintln!("创建文件失败: {:?}", e);
+                    return Err(e);
+                }
+            },
+            other_error => {
+                eprintln!("打开文件时出错: {:?}", other_error);
+                return Err(other_error.into());
+            }
+        },
+    };
+
+    drop(file);
+
     // 获取文件元数据
     let metadata = fs::metadata(file_path)?;
 
