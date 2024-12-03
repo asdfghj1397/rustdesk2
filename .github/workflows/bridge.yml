@@ -73,7 +73,7 @@ jobs:
       - name: Install flutter rust bridge deps
         shell: bash
         run: |
-          cargo install cargo-platform --version 0.1.8
+          cargo add cargo-platform --version 0.1.8
           cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
           pushd flutter && flutter pub get && popd
 
