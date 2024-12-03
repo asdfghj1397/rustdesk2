@@ -150,7 +150,7 @@ jobs:
         run: |
           sed -i '' 's/3.1.0/2.17.0/g' flutter/pubspec.yaml;
           cargo add cargo-platform@=0.1.8
-          cargo install flutter_rust_bridge_codegen --version ${{ matrix.job.bridge }} --features "uuid"
+          cargo install flutter_rust_bridge_codegen --locked --version ${{ matrix.job.bridge }} --features "uuid"
           # below works for mac to make buildable on 3.13.9
           # pushd flutter/lib; find . -name "*.dart" | xargs -I{} sed -i '' 's/textScaler: TextScaler.linear(\(.*\)),/textScaleFactor: \1,/g' {}; popd;
           pushd flutter && flutter pub get && popd
@@ -303,7 +303,7 @@ jobs:
         run: |
           git config --global core.longpaths true
           cargo add cargo-platform@=0.1.8
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
+          cargo install flutter_rust_bridge_codegen --locked --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
           sed -i 's/uni_links_desktop/#uni_links_desktop/g' flutter/pubspec.yaml
           pushd flutter/lib;  find . | grep dart | xargs sed -i 's/textScaler: TextScaler.linear(\(.*\)),/textScaleFactor: \1,/g'; popd;
           pushd flutter ; flutter pub get ; popd

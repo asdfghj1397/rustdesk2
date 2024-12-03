@@ -74,7 +74,7 @@ jobs:
         shell: bash
         run: |
           cargo add cargo-platform@=0.1.8
-          cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
+          cargo install flutter_rust_bridge_codegen --locked --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }} --features "uuid"
           pushd flutter && flutter pub get && popd
 
       - name: Run flutter rust bridge
