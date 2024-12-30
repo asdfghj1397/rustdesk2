@@ -751,7 +751,7 @@ impl Connection {
         );
         video_service::notify_video_frame_fetched(id, None);
         if conn.authorized {
-            password::update_temporary_password();
+            // password::update_temporary_password();
         }
         if let Err(err) = conn.try_port_forward_loop(&mut rx_from_cm).await {
             conn.on_close(&err.to_string(), false).await;
