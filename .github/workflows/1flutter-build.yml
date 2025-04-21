@@ -1,72 +1,88 @@
-name: CI/CD Pipeline
+name: Production Deployment (Manual)
 
-# ================== 触发条件配置 ==================
+# ================== 触发配置 ==================
 on:
-  # 1. 手动触发（GitHub 网页界面或 API）
   workflow_dispatch:
     inputs:
       environment:
         description: '部署环境 (prod/stage)'
         required: true
         default: 'stage'
-      force:
-        description: '强制跳过测试'
+        type: choice
+        options:
+          - prod
+          - stage
+      image_tag:
+        description: '镜像标签 (默认: latest)'
         required: false
-        type: boolean
+        default: 'latest'
+        type: string
 
-  # 2. 代码推送触发
-  push:
-    branches:
-      - main
-      - dev
-    paths-ignore:  # 忽略文档类变更
-      - 'docs/**'
-      - 'README.md'
+# ================== 权限配置 ==================
+permissions:
+  contents: read
+  deployments: write
+  actions: read
+  packages: read
 
-  # 3. PR 合并触发
-  pull_request:
-    types: [closed]
-    branches:
-      - main
+# ================== 全局环境变量 ==================
+env:
+  KUBECONFIG: ${{ secrets.KUBECONFIG_CONTENT }}
+  REGISTRY_URL: ghcr.io/${{ github.repository }}
 
-# ================== 手动触发增强配置 ==================
+# ================== 执行任务 ==================
 jobs:
-  manual-deploy:
-    name: Manual Deployment
-    if: ${{ github.event_name == 'workflow_dispatch' }}
+  validate-inputs:
+    name: Validate Inputs
     runs-on: ubuntu-22.04
     steps:
-      - name: Validate Inputs
+      - name: Check Environment
         run: |
-          echo "部署环境: ${{ github.event.inputs.environment }}"
-          echo "强制模式: ${{ github.event.inputs.force || 'false' }}"
-          
-          # 输入校验逻辑
-          if [ "${{ github.event.inputs.environment }}" != "prod" ] && [ "${{ github.event.inputs.environment }}" != "stage" ]; then
-            echo "::error::环境参数必须是 prod 或 stage"
+          if [ "${{ inputs.environment }}" != "prod" ] && [ "${{ inputs.environment }}" != "stage" ]; then
+            echo "::error::Invalid environment: ${{ inputs.environment }}"
             exit 1
           fi
 
-      - name: Deploy to Kubernetes
-        uses: azure/k8s-deploy@v3
+  deploy-infra:
+    name: Deploy to Cluster
+    needs: validate-inputs
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout Code (Full)
+        uses: actions/checkout@v4  # [!code focus]
+        with:
+          fetch-depth: 0
+          sparse-checkout: |
+            k8s/
+            .github/
+
+      - name: Setup Kubernetes Context
+        uses: azure/k8s-set-context@v3  # [!code focus]
+        with:
+          method: kubeconfig
+          kubeconfig: ${{ env.KUBECONFIG }}
+          context: ${{ inputs.environment }}-cluster
+
+      - name: Verify Manifests
+        run: |
+          echo "工作区路径: ${{ github.workspace }}"
+          ls -R ${{ github.workspace }}/k8s/${{ inputs.environment }}
+
+      - name: Kubernetes Deployment
+        uses: azure/k8s-deploy@v4  # [!code focus]
         with:
           action: deploy
-          manifests: ${{ format('./k8s/{0}/', github.event.inputs.environment) }}
+          manifests: |
+            ${{ github.workspace }}/k8s/${{ inputs.environment }}/deployment.yaml
+            ${{ github.workspace }}/k8s/${{ inputs.environment }}/service.yaml
           images: |
-            my-registry/app:${{ github.sha }}
+            ${{ env.REGISTRY_URL }}:${{ inputs.image_tag }}
+          imagepullsecrets: |
+            regcred
+          strategy: rolling
+          force: false
 
-  # ================== 自动化流水线 ==================
-  auto-build:
-    name: Auto Build
-    if: ${{ github.event_name != 'workflow_dispatch' }}
-    runs-on: ubuntu-22.04
-    needs: [manual-deploy]
-    strategy:
-      matrix:
-        node-version: [18.x, 20.x]
-    steps:
-      - uses: actions/checkout@v4
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ matrix.node-version }}
+      - name: Post-deployment Check
+        run: |
+          kubectl get pods -n ${{ inputs.environment }}
+          kubectl rollout status deployment/myapp -n ${{ inputs.environment }}
