@@ -1,37 +1,32 @@
 name: dash_chat_2
 description: Windows 64-bit Optimized Chat UI
-version: 0.0.18+win64  # 增加平台标识
+version: 0.0.18+win64 # 平台标识
 homepage: https://github.com/asdfghj1397/Dash-Chat-2
 
 environment:
-  sdk: ">=3.0.0 <4.0.0"  # 升级 Dart SDK 要求
-  flutter: ">=3.22.0"     # 强制 Flutter 3.22+ (Windows 11 兼容)
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.22.0"
 
 dependencies:
-  # ===== Windows 核心依赖 =====
   flutter:
     sdk: flutter
-  win32: ^5.0.0  # Windows API 集成
-  window_management: 
-    git: 
-      url: https://github.com/flutter/packages
-      path: packages/window_management/windows/
-      ref: main
-
-  # ===== 跨仓库 UI 组件 =====
-  dash_chat_ui_kit:
+  win32: ^5.0.0
+  window_management:
     git:
-      url: https://github.com/SebastienBtr/Dash-Chat-UI
-      path: windows_ui/
-      ref: win64-stable
-
-  # ===== Windows 优化版依赖 =====
+      url: https://github.com/asdfghj1397/packages
+      path: packages/window_management
+      ref: main
+  dash_chat_ui_kit: # 已切换到你提供的仓库
+    git:
+      url: https://github.com/asdfghj1397/Dash-Chat-2
+      path: windows_ui/ # 假设你的代码在仓库的 windows_ui 子目录
+      ref: win64-stable # 根据你的实际分支/tag调整
   directx_texture_loader: ^0.2.1
   win_video_player: ^1.3.0
-  windows_taskbar: ^2.0.3  # 任务栏交互增强
+  windows_taskbar: ^2.0.3
 
 dev_dependencies:
-  windows_analytics: ^1.1.0  # Windows 专用调试工具
+  windows_analytics: ^1.1.0
   flutter_test:
     sdk: flutter
 
@@ -40,11 +35,9 @@ flutter:
     - assets/icons/win/
     - assets/fonts/windows/
     - assets/win_styles/
-
-  # ===== Windows 构建专属配置 =====
   windows:
     target_platform: x64
-    icon: assets/icons/win/app_icon.ico  # 必须 .ico 格式
+    icon: assets/icons/win/app_icon.ico
     dependencies:
       - win32
       - windows_taskbar
