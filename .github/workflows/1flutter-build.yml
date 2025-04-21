@@ -1,88 +1,86 @@
-name: Production Deployment (Manual)
+name: Build & Deploy (v4)
 
-# ================== 触发配置 ==================
 on:
-  workflow_dispatch:
+  workflow_dispatch:  # 手动触发配置
     inputs:
       environment:
-        description: '部署环境 (prod/stage)'
+        description: '目标环境 (stage/prod)'
         required: true
         default: 'stage'
         type: choice
         options:
-          - prod
           - stage
-      image_tag:
-        description: '镜像标签 (默认: latest)'
-        required: false
-        default: 'latest'
-        type: string
+          - prod
+      confirm-deploy:
+        description: '确认部署操作 (true/false)'
+        required: true
+        default: 'true'
+        type: boolean
+  push:
+    branches:
+      - main
+    paths:
+      - 'flutter/pubspec.yaml'  # 监听 pubspec 文件变更
 
-# ================== 权限配置 ==================
-permissions:
-  contents: read
-  deployments: write
-  actions: read
-  packages: read
-
-# ================== 全局环境变量 ==================
 env:
-  KUBECONFIG: ${{ secrets.KUBECONFIG_CONTENT }}
-  REGISTRY_URL: ghcr.io/${{ github.repository }}
+  REGISTRY_URL: ghcr.io/asdfghj1397/rustdesk2
+  IMAGE_TAG: ${{ github.sha }}
 
-# ================== 执行任务 ==================
 jobs:
-  validate-inputs:
-    name: Validate Inputs
-    runs-on: ubuntu-22.04
+  build-deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'stage' }}  # 动态环境选择
+    permissions:
+      contents: read
+      packages: write
+
     steps:
-      - name: Check Environment
-        run: |
-          if [ "${{ inputs.environment }}" != "prod" ] && [ "${{ inputs.environment }}" != "stage" ]; then
-            echo "::error::Invalid environment: ${{ inputs.environment }}"
-            exit 1
-          fi
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-  deploy-infra:
-    name: Deploy to Cluster
-    needs: validate-inputs
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Checkout Code (Full)
-        uses: actions/checkout@v4  # [!code focus]
-        with:
-          fetch-depth: 0
-          sparse-checkout: |
-            k8s/
-            .github/
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        channel: stable
+        flutter-version: 3.19.5  # 根据实际版本调整
 
-      - name: Setup Kubernetes Context
-        uses: azure/k8s-set-context@v3  # [!code focus]
-        with:
-          method: kubeconfig
-          kubeconfig: ${{ env.KUBECONFIG }}
-          context: ${{ inputs.environment }}-cluster
+    - name: Build Flutter
+      run: |
+        flutter pub get
+        flutter build apk --release  # 或 iOS/web 构建命令
 
-      - name: Verify Manifests
-        run: |
-          echo "工作区路径: ${{ github.workspace }}"
-          ls -R ${{ github.workspace }}/k8s/${{ inputs.environment }}
+    - name: Docker Build & Push
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: ${{ env.REGISTRY_URL }}:${{ env.IMAGE_TAG }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
 
-      - name: Kubernetes Deployment
-        uses: azure/k8s-deploy@v4  # [!code focus]
-        with:
-          action: deploy
-          manifests: |
-            ${{ github.workspace }}/k8s/${{ inputs.environment }}/deployment.yaml
-            ${{ github.workspace }}/k8s/${{ inputs.environment }}/service.yaml
-          images: |
-            ${{ env.REGISTRY_URL }}:${{ inputs.image_tag }}
-          imagepullsecrets: |
-            regcred
-          strategy: rolling
-          force: false
+    - name: Set Kubernetes Context (v4)
+      uses: azure/k8s-set-context@v4
+      with:
+        method: kubeconfig
+        kubeconfig: ${{ secrets.KUBECONFIG_SECRET }}
+        context: ${{ inputs.environment }}-cluster  # 动态上下文名称
+        cluster-type: generic
+        set-current-context: true
+        override: true
 
-      - name: Post-deployment Check
-        run: |
-          kubectl get pods -n ${{ inputs.environment }}
-          kubectl rollout status deployment/myapp -n ${{ inputs.environment }}
+    - name: Deploy to Kubernetes
+      uses: azure/k8s-deploy@v4
+      if: ${{ inputs.confirm-deploy == 'true' }}  # 部署确认开关
+      with:
+        manifests: |
+          k8s/deployment.yaml
+          k8s/service.yaml
+        images: |
+          ${{ env.REGISTRY_URL }}:${{ env.IMAGE_TAG }}
+        namespace: ${{ inputs.environment }}-ns
+        strategy: canary  # 部署策略选项 (canary/blue-green)
+
+    - name: Verify Deployment
+      run: |
+        kubectl get pods -n ${{ inputs.environment }}-ns
+        kubectl get svc -n ${{ inputs.environment }}-ns
