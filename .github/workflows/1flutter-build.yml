@@ -1,17 +1,44 @@
-name: RustDesk CI
+name: 1CI
 
 env:
-  # 明确 Rust 版本控制
-  RUST_VERSION: "1.70.0"
+  # 注释符号后添加空格
+  MIN_SUPPORTED_RUST_VERSION: "1.46.0"
+  CICD_INTERMEDIATES_DIR: "_cicd-intermediates"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+  # vcpkg version: 2024.06.15
   VCPKG_COMMIT_ID: "f7423ee180c4b7f40d43402c2feb3859161ef625"
 
 on:
   workflow_dispatch:
-  pull_request:  # [!code ++]
-  push:  # [!code ++]
-    branches: [ master ]
+  pull_request:
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+  push:
+    branches:
+      - master
+    paths-ignore:
+      - ".github/**"
+      - "docs/**"
+      - "README.md"
+      - "res/**"
+      - "appimage/**"
+      - "flatpak/**"
 
 jobs:
+  ensure_cargo_fmt:
+    name: Ensure 'cargo fmt' has been run
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          default: true
+          profile: minimal
+          components: rustfmt
+      - uses: actions/checkout@v3
+      - run: cargo fmt -- --check
+
   build:
     name: ${{ matrix.job.target }} (${{ matrix.job.os }})
     runs-on: ${{ matrix.job.os }}
@@ -19,54 +46,9 @@ jobs:
       fail-fast: false
       matrix:
         job:
-          # 启用多平台构建
-          - { target: x86_64-unknown-linux-gnu, os: ubuntu-20.04 }
-          - { target: x86_64-pc-windows-msvc, os: windows-2022 }  # [!code ++]
-
-    steps:
-      # 1. 代码检出（已优化为 v4）
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # 2. 跨平台依赖安装
-      - name: Install Prerequisites
-        shell: bash
-        run: |
-          case "${{ matrix.job.target }}" in
-            *linux*)
-              sudo apt-get update -y
-              sudo apt-get install -y clang cmake libgtk-3-dev nasm
-              ;;
-            *windows*)
-              choco install llvm nasm -y  # [!code ++]
-              ;;
-          esac
-
-      # 3. Rust 工具链安装（修复废弃配置）
-      - name: Install Rust Toolchain
-        uses: dtolnay/rust-toolchain@v1
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-          components: rustc, clippy
-
-      # 4. 智能缓存加速
-      - name: Cache Dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      # 5. 构建命令标准化
-      - name: Build Release
-        run: cargo build --release --target ${{ matrix.job.target }}
-
-      # 6. 产物上传（跨平台兼容）
-      - name: Upload Artifact
-        uses: actions/upload-artifact@v4.3.3
-        with:
-          name: rustdesk-${{ matrix.job.target }}
-          path: |
-            target/${{ matrix.job.target }}/release/*.exe
-            target/${{ matrix.job.target }}/release/*.dll
+          # 修正所有矩阵条目
+          - { target: aarch64-unknown-linux-gnu, os: ubuntu-20.04, use-cross: true }
+          - { target: arm-unknown-linux-gnueabihf, os: ubuntu-20.04, use-cross: true }
+          - { target: arm-unknown-linux-musleabihf, os: ubuntu-20.04, use-cross: true }
+          - { target: i686-pc-windows-msvc, os: windows-2022 }
+          - { target: i686-unknown-linux-gnu, os: ubuntu-20.04 }
