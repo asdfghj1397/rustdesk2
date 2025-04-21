@@ -1,6 +1,6 @@
-name: dash_chat_2
-description: Windows 64-bit Optimized Chat UI
-version: 0.0.18+win64 # 平台标识
+name: dash_chat
+description: Cross-platform Chat UI with Adaptive Design
+version: 0.0.19 # 通用版本号
 homepage: https://github.com/asdfghj1397/Dash-Chat-2
 
 environment:
@@ -10,37 +10,62 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  win32: ^5.0.0
-  window_management:
+  
+  # 跨平台基础依赖
+  universal_io: ^2.0.4    # 替代部分平台特定IO操作
+  provider: ^6.0.5        # 状态管理
+  cached_network_image: ^3.2.3 # 图片加载
+  
+  # 平台自适应依赖
+  platform: ^3.1.0        # 平台检测
+  adaptive_components:   # 条件化组件
     git:
-      url: https://github.com/asdfghj1397/packages
-      path: packages/window_management
+      url: https://github.com/asdfghj1397/adaptive_components
       ref: main
-  dash_chat_ui_kit: # 已切换到你提供的仓库
-    git:
-      url: https://github.com/asdfghj1397/Dash-Chat-2
-      path: windows_ui/ # 假设你的代码在仓库的 windows_ui 子目录
-      ref: win64-stable # 根据你的实际分支/tag调整
-  directx_texture_loader: ^0.2.1
-  win_video_player: ^1.3.0
-  windows_taskbar: ^2.0.3
+
+  # Windows 特定依赖（条件化）
+  win32:
+    hosted: 
+      name: win32
+      version: ^5.0.0
+    on: windows
+  
+  # macOS 特定依赖
+  macos_ui: ^0.4.0
+    on: macos
+
+  # Web 支持
+  flutter_web_plugins:
+    sdk: flutter
+    on: web
 
 dev_dependencies:
-  windows_analytics: ^1.1.0
-  flutter_test:
+  # 跨平台测试框架
+  integration_test:
     sdk: flutter
+  mockito: ^5.4.0
 
 flutter:
   assets:
-    - assets/icons/win/
-    - assets/fonts/windows/
-    - assets/win_styles/
-  windows:
-    target_platform: x64
-    icon: assets/icons/win/app_icon.ico
-    dependencies:
-      - win32
-      - windows_taskbar
-    build_args:
-      - --enable-directx12
-      - --disable-ios-compatibility
+    - assets/icons/
+    - assets/fonts/
+    - assets/styles/
+  
+  # 多平台配置
+  platforms:
+    android:
+      package: com.example.dash_chat
+      icon: assets/icons/android/app_icon.png
+    ios:
+      bundleIdentifier: com.example.dashChat
+      icon: assets/icons/ios/AppIcon.appiconset
+    web:
+      renderer: canvaskit
+    windows:
+      target_platform: x64
+      dependencies:
+        - win32
+      build_args:
+        - --enable-directx12
+    macos:
+      minimumOsVersion: '10.15'
