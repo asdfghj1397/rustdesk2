@@ -28,6 +28,25 @@ env:
 
 jobs:
   build-deploy:
+   
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        path: 'flutter'  # 关键配置：将代码检出到子目录
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2
+      with:
+        channel: stable
+        flutter-version: 3.19.5
+
+    - name: Build Project
+      run: |
+        flutter pub get
+        flutter build apk --release
+      working-directory: ./flutter  # 必须与检出路径一致
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment || 'stage' }}  # 动态环境选择
     permissions:
