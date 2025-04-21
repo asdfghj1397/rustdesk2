@@ -1,93 +1,84 @@
-name: Build & Deploy (v4)
+name: Flutter Build & Deploy (v4)
 
 on:
-  workflow_dispatch:  # 手动触发配置
+  workflow_dispatch:  # 手动触发
     inputs:
       environment:
-        description: '目标环境 (stage/prod)'
+        description: 'Environment (stage/prod)'
         required: true
         default: 'stage'
         type: choice
-        options:
-          - stage
-          - prod
-      confirm-deploy:
-        description: '确认部署操作 (true/false)'
+        options: [stage, prod]
+      confirm:
+        description: 'Confirm deployment'
         required: true
-        default: true  # 修正：boolean 值不需要引号
+        default: true
         type: boolean
   push:
-    branches:
-      - main
-    paths:
-      - 'flutter/pubspec.yaml'
+    branches: [main]
+    paths: ['flutter/pubspec.yaml']  # 监听子目录文件
 
 env:
-  REGISTRY_URL: ghcr.io/asdfghj1397/rustdesk2
-  IMAGE_TAG: ${{ github.sha }}
+  FLUTTER_DIR: './flutter'  # 关键路径定义
+  REGISTRY: ghcr.io/yourname/project
+  TAG: ${{ github.sha }}
 
 jobs:
-  build-deploy:
+  build:
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'stage' }}  # 修正：移动到 job 级别
+    environment: ${{ inputs.environment || 'stage' }}
     permissions:
       contents: read
       packages: write
 
     steps:
-    # --- 代码检出与 Flutter 构建 ---
+    # --- 代码检出 ---
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        path: 'flutter'  # 必须指定检出路径
+        path: ${{ env.FLUTTER_DIR }}  # 强制指定检出到子目录
+
+    # --- Flutter 配置 ---
+    - name: Disable analytics
+      run: flutter config --no-analytics  # 关闭分析数据收集
 
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
       with:
         channel: stable
         flutter-version: 3.19.5
+        working-directory: ${{ env.FLUTTER_DIR }}  # 关键配置
 
+    # --- 构建步骤 ---
     - name: Build Flutter
-      working-directory: ./flutter  # 确保与检出路径一致
+      working-directory: ${{ env.FLUTTER_DIR }}  # 必须指定
       run: |
         flutter pub get
         flutter build apk --release
 
-    # --- Docker 镜像构建 ---
-    - name: Docker Build & Push
+    # --- 调试路径 ---
+    - name: Verify paths
+      run: |
+        echo "当前目录: $PWD"
+        ls -la ${{ env.FLUTTER_DIR }}
+
+    # --- Docker 构建 ---
+    - name: Build & Push Docker
       uses: docker/build-push-action@v4
       with:
-        context: ./flutter  # 关键修正：上下文指向 Flutter 目录
+        context: ${{ env.FLUTTER_DIR }}  # 上下文指向 Flutter 目录
         push: true
-        tags: ${{ env.REGISTRY_URL }}:${{ env.IMAGE_TAG }}
+        tags: ${{ env.REGISTRY }}:${{ env.TAG }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
-    # --- Kubernetes 部署 ---
-    - name: Set Kubernetes Context (v4)
-      uses: azure/k8s-set-context@v4
-      with:
-        method: kubeconfig
-        kubeconfig: ${{ secrets.KUBECONFIG_SECRET }}
-        context: ${{ inputs.environment }}-cluster
-        cluster-type: generic
-        set-current-context: true
-        override: true
-
+    # --- 部署步骤 ---
     - name: Deploy to Kubernetes
+      if: ${{ inputs.confirm }}
       uses: azure/k8s-deploy@v4
-      if: ${{ inputs.confirm-deploy }}  # 修正：直接使用 boolean 值
       with:
         manifests: |
-          k8s/deployment.yaml
-          k8s/service.yaml
-        images: |
-          ${{ env.REGISTRY_URL }}:${{ env.IMAGE_TAG }}
+          ${{ env.FLUTTER_DIR }}/k8s/deployment.yaml  # 适配子目录结构
+          ${{ env.FLUTTER_DIR }}/k8s/service.yaml
+        images: ${{ env.REGISTRY }}:${{ env.TAG }}
         namespace: ${{ inputs.environment }}-ns
-        strategy: canary
-
-    # --- 部署验证 ---
-    - name: Verify Deployment
-      run: |
-        kubectl get pods -n ${{ inputs.environment }}-ns
-        kubectl get svc -n ${{ inputs.environment }}-ns
