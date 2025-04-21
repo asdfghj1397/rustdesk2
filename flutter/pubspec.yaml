@@ -1,7 +1,7 @@
 name: dash_chat_2
 description: Windows 64-bit Optimized Chat UI
 version: 0.0.18+win64  # 增加平台标识
-homepage: https://github.com/SebastienBtr/Dash-Chat-2
+homepage: https://github.com/asdfghj1397/Dash-Chat-2
 
 environment:
   sdk: ">=3.0.0 <4.0.0"  # 升级 Dart SDK 要求
