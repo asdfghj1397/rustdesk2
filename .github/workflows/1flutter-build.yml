@@ -1,0 +1,75 @@
+name: 1-Build Windows x64 EXE (Flutter)
+
+on: 
+  workflow_dispatch:    # 手动触发
+  push:                 # 自动触发条件（可选）
+    branches: [ main ]
+    paths: 
+      - 'flutter/**'
+      - 'src/**'
+
+env:
+  SCITER_RUST_VERSION: "1.75"
+  RUST_VERSION: "1.75"
+  LLVM_VERSION: "15.0.6"
+  FLUTTER_VERSION: "3.19.6"
+  FLUTTER_RUST_BRIDGE_VERSION: "1.80.1"
+  VCPKG_COMMIT_ID: "1de2026f28ead93ff1773e6e680387643e914ea1"
+  VCPKG_BINARY_SOURCES: "clear;x-gha,readwrite"
+
+jobs:
+  build-windows-exe1:   # 修改后的工作流名称
+    name: x86_64 Build
+    runs-on: windows-2022
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [x86_64-pc-windows-msvc]  # 只保留64位目标
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install LLVM
+      uses: KyleMayes/install-llvm-action@v1
+      with:
+        version: ${{ env.LLVM_VERSION }}
+
+    - name: Setup Flutter
+      uses: subosito/flutter-action@v2.12.0
+      with:
+        channel: "stable"
+        flutter-version: ${{ env.FLUTTER_VERSION }}
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@v1
+      with:
+        toolchain: ${{ env.SCITER_RUST_VERSION }}
+        targets: ${{ matrix.target }}
+
+    - name: Build Prep
+      run: |
+        git config --global core.longpaths true
+        cargo install flutter_rust_bridge_codegen --version ${{ env.FLUTTER_RUST_BRIDGE_VERSION }}
+        flutter pub get
+
+    - name: Run vcpkg
+      uses: lukka/run-vcpkg@v11
+      with:
+        vcpkgDirectory: C:\vcpkg
+        vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+        vcpkgTriplet: x64-windows-static  # 仅保留Windows配置
+
+    - name: Build EXE
+      run: |
+        flutter_rust_bridge_codegen --rust-input ./src/flutter_ffi.rs --dart-output ./flutter/lib/generated_bridge.dart
+        cargo build --release --target ${{ matrix.target }}
+
+    - name: Upload Artifact
+      if: success()
+      uses: actions/upload-artifact@v3
+      with:
+        name: rustdesk-windows-x64
+        path: |
+          target/${{ matrix.target }}/release/*.exe
+          target/${{ matrix.target }}/release/*.dll
