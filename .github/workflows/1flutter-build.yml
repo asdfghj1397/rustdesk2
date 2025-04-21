@@ -19,7 +19,7 @@ on:
     paths: ['flutter/pubspec.yaml']
 
 env:
-  FLUTTER_DIR: './flutter'  # 统一目录变量
+  FLUTTER_DIR: './flutter'
   REGISTRY: ghcr.io/asdfghj1397/rustdesk2
   TAG: ${{ github.sha }}
 
@@ -36,7 +36,7 @@ jobs:
       - name: Checkout code (subdir)
         uses: actions/checkout@v4
         with:
-          path: ${{ env.FLUTTER_DIR }}  # 强制检出到子目录
+          path: ${{ env.FLUTTER_DIR }}
 
       # --- Flutter 环境配置 ---
       - name: Install Flutter
@@ -65,7 +65,7 @@ jobs:
       - name: Build Docker Image
         uses: docker/build-push-action@v4
         with:
-          context: ${{ env.FLUTTER_DIR }}  # 关键路径修正
+          context: ${{ env.FLUTTER_DIR }}
           push: ${{ inputs.confirm }}
           tags: ${{ env.REGISTRY }}:${{ env.TAG }}
           cache-from: type=gha
@@ -85,4 +85,9 @@ jobs:
         uses: azure/k8s-deploy@v4
         with:
           manifests: |
-            ${{ env.FLUTTER_DIR }}/
+            ${{ env.FLUTTER_DIR }}/k8s/deployment.yaml
+            ${{ env.FLUTTER_DIR }}/k8s/service.yaml
+          images: |
+            ${{ env.REGISTRY }}:${{ env.TAG }}
+          namespace: ${{ inputs.environment }}-ns
+          strategy: canary
