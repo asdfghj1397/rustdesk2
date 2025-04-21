@@ -14,13 +14,13 @@ on:
       confirm-deploy:
         description: '确认部署操作 (true/false)'
         required: true
-        default: 'true'
+        default: true  # 修正：boolean 值不需要引号
         type: boolean
   push:
     branches:
       - main
     paths:
-      - 'flutter/pubspec.yaml'  # 监听 pubspec 文件变更
+      - 'flutter/pubspec.yaml'
 
 env:
   REGISTRY_URL: ghcr.io/asdfghj1397/rustdesk2
@@ -28,13 +28,18 @@ env:
 
 jobs:
   build-deploy:
-   
     runs-on: ubuntu-latest
+    environment: ${{ inputs.environment || 'stage' }}  # 修正：移动到 job 级别
+    permissions:
+      contents: read
+      packages: write
+
     steps:
+    # --- 代码检出与 Flutter 构建 ---
     - name: Checkout code
       uses: actions/checkout@v4
       with:
-        path: 'flutter'  # 关键配置：将代码检出到子目录
+        path: 'flutter'  # 必须指定检出路径
 
     - name: Setup Flutter
       uses: subosito/flutter-action@v2
@@ -42,54 +47,36 @@ jobs:
         channel: stable
         flutter-version: 3.19.5
 
-    - name: Build Project
+    - name: Build Flutter
+      working-directory: ./flutter  # 确保与检出路径一致
       run: |
         flutter pub get
         flutter build apk --release
-      working-directory: ./flutter  # 必须与检出路径一致
-    runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'stage' }}  # 动态环境选择
-    permissions:
-      contents: read
-      packages: write
 
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Flutter
-      uses: subosito/flutter-action@v2
-      with:
-        channel: stable
-        flutter-version: 3.19.5  # 根据实际版本调整
-
-    - name: Build Flutter
-      run: |
-        flutter pub get
-        flutter build apk --release  # 或 iOS/web 构建命令
-
+    # --- Docker 镜像构建 ---
     - name: Docker Build & Push
       uses: docker/build-push-action@v4
       with:
-        context: .
+        context: ./flutter  # 关键修正：上下文指向 Flutter 目录
         push: true
         tags: ${{ env.REGISTRY_URL }}:${{ env.IMAGE_TAG }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
 
+    # --- Kubernetes 部署 ---
     - name: Set Kubernetes Context (v4)
       uses: azure/k8s-set-context@v4
       with:
         method: kubeconfig
         kubeconfig: ${{ secrets.KUBECONFIG_SECRET }}
-        context: ${{ inputs.environment }}-cluster  # 动态上下文名称
+        context: ${{ inputs.environment }}-cluster
         cluster-type: generic
         set-current-context: true
         override: true
 
     - name: Deploy to Kubernetes
       uses: azure/k8s-deploy@v4
-      if: ${{ inputs.confirm-deploy == 'true' }}  # 部署确认开关
+      if: ${{ inputs.confirm-deploy }}  # 修正：直接使用 boolean 值
       with:
         manifests: |
           k8s/deployment.yaml
@@ -97,8 +84,9 @@ jobs:
         images: |
           ${{ env.REGISTRY_URL }}:${{ env.IMAGE_TAG }}
         namespace: ${{ inputs.environment }}-ns
-        strategy: canary  # 部署策略选项 (canary/blue-green)
+        strategy: canary
 
+    # --- 部署验证 ---
     - name: Verify Deployment
       run: |
         kubectl get pods -n ${{ inputs.environment }}-ns
